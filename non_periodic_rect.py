@@ -2,18 +2,9 @@ import getopt
 import numpy as np
 import scipy.integrate as integrate
 import sys
-from matplotlib import pylab
-
-from enum import Enum
-
-
-class PMeasures(Enum):
-    RADIANS = 0
-    DEGREES = 1
-
+from matplotlib import pylab, rc
 
 STEPS = 1000
-P_MEASURE = PMeasures.RADIANS
 
 
 def step(var):
@@ -25,7 +16,7 @@ def sig(time, amplitude, delay, length):
 
 
 def top_analysis_frequency(length):
-    return 2.5 * 1 / length * 5
+    return 2.5 * 1 / length * 2.5
 
 
 def analyze_non_periodic(amplitude, delay, length):
@@ -38,7 +29,7 @@ def analyze_non_periodic(amplitude, delay, length):
     freqs = []
     amps = []
     phs = []
-    w = 0.0
+    w = -top_analysis_frequency(length)
 
     while w < top_analysis_frequency(length):
         w += top_analysis_frequency(length) / STEPS
@@ -52,30 +43,85 @@ def analyze_non_periodic(amplitude, delay, length):
 
         freqs.append(w)
         amps.append(abs(comp))
-        phs.append(np.angle(comp))
+        phs.append(np.angle(np.array(comp)) if abs(comp) > max(amps) * 0.001 else 0.00)
+
+    _bot_b = amplitude * -0.5
+    _top_b = amplitude * 1.5
+    _left_b = s_begin - 0.2 * length
+    _right_b = s_end + 0.2 * length
+    _maj_tick_x = (_right_b - _left_b) / 10.0
+    _min_tick_x = (_right_b - _left_b) / 50.0
+    _maj_tick_y = (_top_b - _bot_b) / 10.0
+    _min_tick_y = (_top_b - _bot_b) / 50.0
+    _maj_tick_freq = 1.0 / length
+    _min_tick_freq = _maj_tick_freq / 5.0
+
+    rc('font', **{'family': 'sans-serif', 'sans-serif': ['Helvetica']})
+    rc('text', usetex=True)
 
     f = pylab.figure()
 
     sbp_1 = f.add_subplot(2, 2, 1)
     sbp_1.set_ylabel('S(t)')
-    sbp_1.set_xlabel('Time, s')
+    sbp_1.set_xlabel('t, s')
+    sbp_1.set_xlim([_left_b, _right_b])
+    sbp_1.set_ylim([_bot_b, _top_b])
 
-    pylab.title('Signal')
+    sbp_1.set_xticks(np.arange(_left_b, _right_b + _maj_tick_x, _maj_tick_x))
+    sbp_1.set_xticks(np.arange(_left_b, _right_b + _min_tick_x, _min_tick_x), minor=True)
+    sbp_1.set_yticks(np.arange(_bot_b, _top_b + _maj_tick_y, _maj_tick_y))
+    sbp_1.set_yticks(np.arange(_bot_b, _top_b + _min_tick_y, _min_tick_y), minor=True)
+
+    sbp_1.grid(which='minor', alpha=0.2)
+    sbp_1.grid(which='major', alpha=0.75)
+
+    pylab.title(r'Signal')
     pylab.plot(strobes, sig(strobes, amplitude, delay, length))
 
     sbp_2 = f.add_subplot(2, 2, 3)
-    sbp_2.set_ylabel('Amplitude')
-    sbp_2.set_xlabel('Frequency, Hz')
+    sbp_2.set_ylabel(r'S(f)')
+    sbp_2.set_xlabel(r'f, Hz')
+    sbp_2.set_xlim([min(freqs), max(freqs)])
+    sbp_2.set_ylim([0, max(amps)])
 
-    pylab.title('Amplitude spectrum')
+    sbp_2.set_xticks(np.arange(np.ceil(min(freqs)), np.floor(max(freqs)) + _maj_tick_freq, _maj_tick_freq))
+    sbp_2.set_xticks(np.arange(np.ceil(min(freqs)), np.floor(max(freqs)) + _min_tick_freq, _min_tick_freq), minor=True)
+    sbp_2.set_yticks(np.arange(0, max(amps) + _maj_tick_y, _maj_tick_y))
+    sbp_2.set_yticks(np.arange(0, max(amps) + _min_tick_y, _min_tick_y), minor=True)
+
+    sbp_2.grid(which='minor', alpha=0.2)
+    sbp_2.grid(which='major', alpha=0.75)
+
+    pylab.title(r'Amplitude spectrum')
     pylab.plot(freqs, amps)
 
     sbp_3 = f.add_subplot(2, 2, 4)
-    sbp_3.set_ylabel('Phase, radians' if P_MEASURE == PMeasures.RADIANS else 'Phase, degrees')
-    sbp_3.set_xlabel('Frequency, Hz')
+    degs = sbp_3.twinx()
 
-    pylab.title('Phase spectrum')
-    pylab.plot(freqs, phs if P_MEASURE == PMeasures.RADIANS else np.degrees(phs))
+    sbp_3.set_ylabel(r'$\Phi$, rad')
+    sbp_3.set_xlabel(r'f, Hz')
+    sbp_3.set_xlim([min(freqs), max(freqs)])
+    sbp_3.set_ylim([-np.pi, np.pi])
+
+    sbp_3.set_xticks(np.arange(np.ceil(min(freqs)), np.floor(max(freqs)) + _maj_tick_freq, _maj_tick_freq))
+    sbp_3.set_xticks(np.arange(np.ceil(min(freqs)), np.floor(max(freqs)) + _min_tick_freq, _min_tick_freq), minor=True)
+    sbp_3.set_yticks(np.arange(-np.pi, np.pi + np.pi / 4.0, np.pi / 4.0))
+    sbp_3.set_yticks(np.arange(-np.pi, np.pi + np.pi / 20.0, np.pi / 20.0), minor=True)
+    sbp_3.set_yticklabels([r'$-\Pi$', r'$-3\Pi/4$', r'$-\Pi/2$',
+                           r'$-\Pi/4$', r'$0$', r'$\Pi/4$',
+                           r'$\Pi/2$', r'$3\Pi/4$', r'$\Pi$'])
+
+    degs.set_ylabel(r'$\Phi$, deg')
+    degs.set_ylim([-180, 180])
+    degs.set_yticks(np.arange(-180.0, 180.0 + 45.0, 45.0))
+    degs.set_yticks(np.arange(-180.0, 180.0 + 15.0, 15.0), minor=True)
+
+    sbp_3.grid(which='minor', alpha=0.2)
+    sbp_3.grid(which='major', alpha=0.75)
+
+    pylab.title(r'Phase spectrum')
+    sbp_3.plot(freqs, phs)
+    # degs.plot(freqs, np.degrees(phs))
 
     pylab.show()
 
