@@ -4,7 +4,7 @@ import scipy.integrate as integrate
 import sys
 from matplotlib import pylab, rc
 
-STEPS = 1000
+STEPS = 300
 
 
 def step(var):
@@ -29,7 +29,11 @@ def analyze_non_periodic(amplitude, delay, length):
     freqs = []
     amps = []
     phs = []
+    comps = []
+    rest = []
+    
     w = -top_analysis_frequency(length)
+    t = s_begin
 
     while w < top_analysis_frequency(length):
         w += top_analysis_frequency(length) / STEPS
@@ -40,12 +44,25 @@ def analyze_non_periodic(amplitude, delay, length):
                                  s_begin,
                                  s_end)[0]
         comp = comp_re + comp_im * 1j
-
+        
+        comps.append(comp)
         freqs.append(w)
         amps.append(abs(comp))
         phs.append(np.angle(np.array(comp)) if abs(comp) > max(amps) * 0.001 else 0.00)
+    
+    while t < s_end:
+        t += length / STEPS
+        
+        comp_re = 0.0
+        comp_im = 0.0
+        
+        for w in zip(freqs, comps):
+            comp += w[1] * np.exp(2 * np.pi * 1j * t * w[0]) * length / STEPS
+            
+        print(comp)
+        rest.append(abs(comp))
 
-    _bot_b = amplitude * -0.5
+    _bot_b = 0
     _top_b = amplitude * 1.5
     _left_b = s_begin - 0.2 * length
     _right_b = s_end + 0.2 * length
@@ -57,7 +74,7 @@ def analyze_non_periodic(amplitude, delay, length):
     _min_tick_freq = _maj_tick_freq / 5.0
 
     rc('font', **{'family': 'sans-serif', 'sans-serif': ['Helvetica']})
-    rc('text', usetex=True)
+    #rc('text', usetex=True)
 
     f = pylab.figure()
 
@@ -67,20 +84,20 @@ def analyze_non_periodic(amplitude, delay, length):
     sbp_1.set_xlim([_left_b, _right_b])
     sbp_1.set_ylim([_bot_b, _top_b])
 
-    sbp_1.set_xticks(np.arange(_left_b, _right_b + _maj_tick_x, _maj_tick_x))
-    sbp_1.set_xticks(np.arange(_left_b, _right_b + _min_tick_x, _min_tick_x), minor=True)
+    sbp_1.set_xticks(np.arange(_left_b, _right_b, _maj_tick_x))
+    sbp_1.set_xticks(np.arange(_left_b, _right_b, _min_tick_x), minor=True)
     sbp_1.set_yticks(np.arange(_bot_b, _top_b + _maj_tick_y, _maj_tick_y))
     sbp_1.set_yticks(np.arange(_bot_b, _top_b + _min_tick_y, _min_tick_y), minor=True)
 
     sbp_1.grid(which='minor', alpha=0.2)
     sbp_1.grid(which='major', alpha=0.75)
 
-    pylab.title(r'Signal')
+    pylab.title('Signal')
     pylab.plot(strobes, sig(strobes, amplitude, delay, length))
 
     sbp_2 = f.add_subplot(2, 2, 3)
-    sbp_2.set_ylabel(r'S(f)')
-    sbp_2.set_xlabel(r'f, Hz')
+    sbp_2.set_ylabel('S(f)')
+    sbp_2.set_xlabel('f, Hz')
     sbp_2.set_xlim([min(freqs), max(freqs)])
     sbp_2.set_ylim([0, max(amps)])
 
@@ -92,14 +109,14 @@ def analyze_non_periodic(amplitude, delay, length):
     sbp_2.grid(which='minor', alpha=0.2)
     sbp_2.grid(which='major', alpha=0.75)
 
-    pylab.title(r'Amplitude spectrum')
+    pylab.title('Amplitude spectrum')
     pylab.plot(freqs, amps)
 
     sbp_3 = f.add_subplot(2, 2, 4)
     degs = sbp_3.twinx()
 
-    sbp_3.set_ylabel(r'$\Phi$, rad')
-    sbp_3.set_xlabel(r'f, Hz')
+    sbp_3.set_ylabel('$\Phi$, rad')
+    sbp_3.set_xlabel('f, Hz')
     sbp_3.set_xlim([min(freqs), max(freqs)])
     sbp_3.set_ylim([-np.pi, np.pi])
 
@@ -111,7 +128,7 @@ def analyze_non_periodic(amplitude, delay, length):
                            r'$-\Pi/4$', r'$0$', r'$\Pi/4$',
                            r'$\Pi/2$', r'$3\Pi/4$', r'$\Pi$'])
 
-    degs.set_ylabel(r'$\Phi$, deg')
+    degs.set_ylabel('$\Phi$, deg')
     degs.set_ylim([-180, 180])
     degs.set_yticks(np.arange(-180.0, 180.0 + 45.0, 45.0))
     degs.set_yticks(np.arange(-180.0, 180.0 + 15.0, 15.0), minor=True)
@@ -119,9 +136,26 @@ def analyze_non_periodic(amplitude, delay, length):
     sbp_3.grid(which='minor', alpha=0.2)
     sbp_3.grid(which='major', alpha=0.75)
 
-    pylab.title(r'Phase spectrum')
+    pylab.title('Phase spectrum')
     sbp_3.plot(freqs, phs)
     # degs.plot(freqs, np.degrees(phs))
+    
+    sbp_4 = f.add_subplot(2, 2, 2)
+    sbp_4.set_ylabel('S(t)')
+    sbp_4.set_xlabel('t, s')
+    sbp_4.set_xlim([_left_b, _right_b])
+    sbp_4.set_ylim([_bot_b, _top_b])
+
+    sbp_4.set_xticks(np.arange(_left_b, _right_b, _maj_tick_x))
+    sbp_4.set_xticks(np.arange(_left_b, _right_b, _min_tick_x), minor=True)
+    sbp_4.set_yticks(np.arange(_bot_b, _top_b + _maj_tick_y, _maj_tick_y))
+    sbp_4.set_yticks(np.arange(_bot_b, _top_b + _min_tick_y, _min_tick_y), minor=True)
+
+    sbp_4.grid(which='minor', alpha=0.2)
+    sbp_4.grid(which='major', alpha=0.75)
+
+    pylab.title('Reconstructed signal')
+    pylab.plot(strobes, rest)
 
     pylab.show()
 
@@ -135,7 +169,7 @@ def main(argv):
         opts, args = getopt.getopt(argv, "",
                                    ["amplitude=", "delay=", "length="])
     except getopt.GetoptError:
-        print 'non_periodic_rect.py --amplitude %FLOAT% --delay %FLOAT% --length %FLOAT%'
+        print("non_periodic_rect.py --amplitude %FLOAT% --delay %FLOAT% --length %FLOAT%")
         sys.exit(2)
 
     for opt, arg in opts:
